@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>2511班 王天赐 网页设计</title>
+    <style>
+        :root{
+            --bg-1:#001f3f; /* 深夜蓝 */
+            --accent-1:#00b4d8; /* 青 */
+            --accent-2:#0077b6; /* 蓝 */
+            --glass: rgba(255,255,255,0.06);
+        }
+        html,body{height:100%;margin:0;font-family:system-ui,-apple-system,'Segoe UI',Roboto,'PingFang SC','Hiragino Sans GB','Microsoft Yahei',sans-serif;background:linear-gradient(180deg,#bfe9ff 0%, #a6ddff 45%, #79c6ff 100%);color:#022e4a;overflow:hidden}
+        canvas#bg{position:fixed;inset:0;z-index:0;display:block}
+        .site-title{position:fixed;top:22px;left:50%;transform:translateX(-50%);z-index:10;margin:0;padding:10px 22px;border-radius:12px;color:#00bfa5;font-weight:700;font-size:clamp(18px,3.5vw,34px);backdrop-filter: blur(6px);background:linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));box-shadow:0 6px 24px rgba(2,12,27,0.6)}
+        /* 统一导航样式（点击展开，缩放+渐显） */
+        .nav-circle-wrap{position:fixed;top:18px;left:18px;z-index:120}
+        .nav-circle{width:56px;height:56px;border-radius:50%;background:#fff;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 8px 26px rgba(2,8,20,0.12);cursor:pointer;border:0;font-weight:700;color:#013a63;font-size:14px}
+        .nav-menu{position:absolute;top:70px;left:0;min-width:200px;background:#fff;border-radius:10px;padding:8px 6px;box-shadow:0 12px 40px rgba(2,8,20,0.12);opacity:0;transform:translateY(-8px) scale(.96);pointer-events:none;transition:opacity .18s ease,transform .18s cubic-bezier(.2,.9,.2,1)}
+        .nav-circle-wrap.open .nav-menu,.nav-circle-wrap:focus-within .nav-menu{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
+        .nav-circle-wrap.open .nav-circle{transform:scale(1.06);transition:transform .18s ease}
+        .nav-menu a{display:block;padding:10px 12px;color:#013a63;text-decoration:none;border-radius:6px}
+        .nav-menu a:hover{background:rgba(0,191,165,0.06);color:#00777a}
+        .subtitle{display:block;font-size:12px;opacity:.9;margin-top:4px;font-weight:500;color:rgba(0,191,165,0.9)}
+
+        /* 瓦片区域 */
+        #stage{position:relative;z-index:5;width:100%;height:100%;padding-top:110px}
+        .tile{position:absolute;min-width:140px;min-height:120px;padding:16px;border-radius:14px;color:#033554;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;box-shadow:0 10px 30px rgba(2,12,27,0.18);cursor:pointer;transition:left 1300ms cubic-bezier(.22,.9,.2,1), top 1300ms cubic-bezier(.22,.9,.2,1), box-shadow 300ms, background 1200ms ease;user-select:none}
+        .tile:hover{transform:translateY(-8px) scale(1.025);box-shadow:0 18px 40px rgba(2,12,27,0.45)}
+        @keyframes floatY {0%{transform:translateY(0)}50%{transform:translateY(-10px)}100%{transform:translateY(0)}}
+        .tile .label{font-size:18px;letter-spacing:0.6px;display:inline-block;padding:4px 6px}
+        /* 渐变文字（现代浏览器支持） */
+        .label-gradient{
+            background: linear-gradient(90deg,#04507a,#00a6ff,#2ec4b6);-webkit-background-clip:text;background-clip:text;color:transparent;
+        }
+        .tile .label{pointer-events:none}
+
+        /* 确保移动过程更有美感 */
+        .tile[data-size="s"]{width:120px;height:120px}
+        .tile[data-size="m"]{width:160px;height:140px}
+        .tile[data-size="l"]{width:200px;height:160px}
+
+        /* 小提示 */
+        .legend{position:fixed;right:18px;bottom:18px;z-index:8;padding:10px 14px;border-radius:10px;background:var(--glass);font-size:13px;color:rgba(255,255,255,0.85);backdrop-filter: blur(6px)}
+
+        @media (max-width:600px){
+            .site-title{top:12px;padding:8px 14px;font-size:18px}
+            #stage{padding-top:86px}
+        }
+    </style>
+</head>
+<body>
+    <canvas id="bg"></canvas>
+    <h1 class="site-title">王天赐 的作品页<span class="subtitle">2511班</span></h1>
+
+    <div class="nav-circle-wrap">
+        <button class="nav-circle" aria-haspopup="true" aria-label="导航">导航</button>
+        <nav class="nav-menu" aria-label="站点导航">
+            <a href="index.html">目录</a>
+            <a href="introduction.html">自我介绍</a>
+            <a href="hobby.html">兴趣爱好</a>
+            <a href="picture.html">校园风光</a>
+            <a href="contact.html">联系方式</a>
+        </nav>
+    </div>
+
+    <div id="stage"></div>
+    <div class="legend">提示：鼠标悬停可获得细微放大动画</div>
+
+    <script>
+        /* ----------------- 背景动画（canvas） ----------------- */
+        const canvas = document.getElementById('bg');
+        const ctx = canvas.getContext('2d');
+        let DPR = Math.max(1, window.devicePixelRatio || 1);
+        function resize(){
+            DPR = Math.max(1, window.devicePixelRatio || 1);
+            canvas.width = Math.floor(window.innerWidth * DPR);
+            canvas.height = Math.floor(window.innerHeight * DPR);
+            canvas.style.width = window.innerWidth + 'px';
+            canvas.style.height = window.innerHeight + 'px';
+            ctx.setTransform(DPR,0,0,DPR,0,0);
+        }
+        window.addEventListener('resize', resize, {passive:true});
+        resize();
+
+        // 生成若干光斑（blob）
+        const blobs = [];
+        const blobCount = Math.max(3, Math.floor(window.innerWidth / 500));
+        for(let i=0;i<blobCount;i++){
+            blobs.push({
+                x: Math.random()*window.innerWidth,
+                y: Math.random()*window.innerHeight*0.7,
+                r: 160 + Math.random()*200,
+                vx: (Math.random()-0.5)*0.06, // 很慢
+                vy: (Math.random()-0.5)*0.06,
+                hue: 200 + Math.random()*30, // 天蓝到青蓝
+                alpha: 0.03 + Math.random()*0.06
+            });
+        }
+
+        // 鼠标追踪，用于云朵交互（视差）
+        let mouseX = window.innerWidth/2, mouseY = window.innerHeight/2;
+        window.addEventListener('mousemove',(e)=>{ mouseX = e.clientX; mouseY = e.clientY; });
+        window.addEventListener('touchmove',(e)=>{ if(e.touches && e.touches[0]){ mouseX = e.touches[0].clientX; mouseY = e.touches[0].clientY; } },{passive:true});
+
+        // 生成确定性的云朵数据（避免每帧随机，保证稳定形状）
+        const clouds = [];
+        const cloudCount = 3; // 更稀疏
+        for(let i=0;i<cloudCount;i++){
+            const baseX = (i+1) * window.innerWidth/(cloudCount+1);
+            const baseY = 50 + i*22; // 靠上方
+            const scale = 0.9 + (i%2)*0.25;
+            const alpha = 0.88 - i*0.08;
+            const parts = 5 + (i%3);
+            const offsets = [];
+            for(let p=0;p<parts;p++){
+                offsets.push({dx: (p - parts/2) * 22 + (Math.random()-0.5)*8, dy: (Math.random()-0.5)*8, r: 28*scale + Math.random()*18*scale});
+            }
+            clouds.push({baseX, baseY, scale, alpha, offsets, drift: (Math.random()-0.5)*0.02});
+        }
+
+        // 飞翔的小鸟粒子
+        const birds = [];
+        const birdCount = 5;
+        for(let i=0;i<birdCount;i++){
+            const dir = Math.random() < 0.5 ? 1 : -1;
+            birds.push({
+                x: Math.random()*window.innerWidth,
+                y: 80 + Math.random()*160,
+                vx: dir * (0.6 + Math.random()*1.2),
+                dir,
+                wing: Math.random()*Math.PI*2,
+                wingSpeed: 0.12 + Math.random()*0.18,
+                size: 6 + Math.random()*6,
+            });
+        }
+
+        function drawBg(t){
+            ctx.clearRect(0,0,window.innerWidth,window.innerHeight);
+            // 背景已经用 CSS gradient 处理，为淡蓝天空；这里绘制细微顶层亮度与光斑
+            // 画光斑（作为天空亮斑，极其柔和）
+            ctx.globalCompositeOperation = 'lighter';
+            for(const b of blobs){
+                b.x += Math.sin((t*0.00002)+b.hue*0.008)*b.vx + b.vx*0.4;
+                b.y += Math.cos((t*0.000018)+b.hue*0.006)*b.vy + b.vy*0.4;
+                if(b.x < -b.r) b.x = window.innerWidth + b.r;
+                if(b.x > window.innerWidth + b.r) b.x = -b.r;
+                if(b.y < -b.r) b.y = window.innerHeight + b.r;
+                if(b.y > window.innerHeight + b.r) b.y = -b.r;
+                const radial = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
+                radial.addColorStop(0, `rgba(255,255,255,${b.alpha*0.85})`);
+                radial.addColorStop(0.5, `rgba(220,245,255,${b.alpha*0.6})`);
+                radial.addColorStop(1, `rgba(180,220,255,0)`);
+                ctx.fillStyle = radial;
+                ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI*2); ctx.fill();
+            }
+            ctx.globalCompositeOperation = 'source-over';
+
+            // 轻微噪点层（半透明）
+            ctx.fillStyle = 'rgba(255,255,255,0.008)';
+            for(let i=0;i<60;i++){
+                const x = (Math.sin(i*12.9898 + t*0.00003) + 1)/2 * window.innerWidth;
+                const y = (Math.cos(i*78.233 + t*0.00002) + 1)/2 * window.innerHeight;
+                ctx.fillRect(x, y, 1, 1);
+            }
+
+            // 绘制云朵（使用确定性的 offsets），并对鼠标做轻微视差
+            const centerX = window.innerWidth/2, centerY = window.innerHeight/2;
+            const mx = (mouseX - centerX) / window.innerWidth;
+            const my = (mouseY - centerY) / window.innerHeight;
+            for(let i=0;i<clouds.length;i++){
+                const c = clouds[i];
+                const driftX = Math.sin(t*0.00001 + i*0.8) * 40 * c.drift;
+                const driftY = Math.cos(t*0.000008 + i*0.6) * 8 * c.drift;
+                const cx = c.baseX + driftX + mx * 40 * (i+1) * 0.12;
+                const cy = c.baseY + driftY + my * 20 * (i+1) * 0.06;
+                for(let p=0;p<c.offsets.length;p++){
+                    const off = c.offsets[p];
+                    const rx = cx + off.dx * c.scale + Math.sin(t*0.00012 + p)*6;
+                    const ry = cy + off.dy * c.scale + Math.cos(t*0.00011 + p)*4;
+                    const rr = off.r;
+                    const rg = ctx.createRadialGradient(rx,ry,rr*0.2,rx,ry,rr);
+                    rg.addColorStop(0, `rgba(255,255,255,${0.9*c.alpha})`);
+                    rg.addColorStop(1, `rgba(255,255,255,0)`);
+                    ctx.fillStyle = rg;
+                    ctx.beginPath(); ctx.arc(rx,ry,rr,0,Math.PI*2); ctx.fill();
+                }
+            }
+
+                // 飞翔的小鸟：改为 SVG 图标，使用渐变填充并通过 JS 更新位置与翅膀角度
+                // 如果 SVG 容器不存在则创建
+                if(!document.getElementById('svgBirds')){
+                    const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+                    svg.id = 'svgBirds';
+                    svg.setAttribute('width','100%'); svg.setAttribute('height','100%');
+                    svg.style.position = 'fixed'; svg.style.left = 0; svg.style.top = 0; svg.style.zIndex = 3; svg.style.pointerEvents = 'none';
+                    document.body.appendChild(svg);
+                    const defs = document.createElementNS('http://www.w3.org/2000/svg','defs'); svg.appendChild(defs);
+                    // 创建渐变并复用（会根据每只鸟稍作调整）
+                    for(let i=0;i<8;i++){
+                        const grad = document.createElementNS('http://www.w3.org/2000/svg','linearGradient');
+                        grad.id = 'birdGrad'+i; grad.setAttribute('x1','0%'); grad.setAttribute('y1','0%'); grad.setAttribute('x2','100%'); grad.setAttribute('y2','0%');
+                        const s1 = document.createElementNS('http://www.w3.org/2000/svg','stop'); s1.setAttribute('offset','0%'); s1.setAttribute('stop-color',['#00a6ff','#2ec4b6','#7bdff6','#66ccff','#81d8ff','#aee7ff','#7ec8f8','#73b8ff'][i%8]);
+                        const s2 = document.createElementNS('http://www.w3.org/2000/svg','stop'); s2.setAttribute('offset','100%'); s2.setAttribute('stop-color',['#6dd3ff','#9be8ff','#b2f0e6','#9adfff','#bfefff','#dff7ff','#b6e6ff','#9fd4ff'][(i+3)%8]);
+                        grad.appendChild(s1); grad.appendChild(s2); defs.appendChild(grad);
+                    }
+                    // 保存 reference
+                    window.__svgBirds = svg;
+                }
+                // 更新或创建鸟元素
+                for(const b of birds){
+                    // 初始化 SVG element if needed
+                    if(!b.el){
+                        const svg = window.__svgBirds;
+                        const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+                        g.setAttribute('transform','translate('+b.x+','+b.y+')');
+                        g.setAttribute('opacity', '0.98');
+                        // body
+                        const body = document.createElementNS('http://www.w3.org/2000/svg','ellipse');
+                        body.setAttribute('cx','0'); body.setAttribute('cy','0'); body.setAttribute('rx', b.size*0.6); body.setAttribute('ry', b.size*0.4);
+                        body.setAttribute('fill', 'url(#'+('birdGrad'+(Math.floor(Math.random()*8)))+')');
+                        body.setAttribute('stroke','rgba(4,38,60,0.12)'); body.setAttribute('stroke-width','0.6');
+                        // left wing
+                        const left = document.createElementNS('http://www.w3.org/2000/svg','path');
+                        left.setAttribute('d', `M ${-b.size*0.2} 0 Q ${-b.size*1.2} ${-b.size*1.0} ${-b.size*0.2} ${-b.size*0.2}`);
+                        left.setAttribute('fill', 'rgba(255,255,255,0.95)'); left.setAttribute('class','wing-left');
+                        // right wing
+                        const right = document.createElementNS('http://www.w3.org/2000/svg','path');
+                        right.setAttribute('d', `M ${b.size*0.2} 0 Q ${b.size*1.2} ${-b.size*1.0} ${b.size*0.2} ${-b.size*0.2}`);
+                        right.setAttribute('fill', 'rgba(255,255,255,0.95)'); right.setAttribute('class','wing-right');
+                        g.appendChild(body); g.appendChild(left); g.appendChild(right);
+                        svg.appendChild(g);
+                        b.el = g; b.parts = {body,left,right};
+                    }
+                    // 更新位置
+                    b.x += b.vx;
+                    b.wing += b.wingSpeed;
+                    if(b.vx > 0 && b.x > window.innerWidth + 80) b.x = -80;
+                    if(b.vx < 0 && b.x < -80) b.x = window.innerWidth + 80;
+                    // 旋转角度稍作调整
+                    const angle = b.vx > 0 ? 6 : -6;
+                    // 翅膀摆动
+                    const flap = Math.sin(b.wing) * (b.size*0.9);
+                    // 调整左/右翼的 path 控制点以表现摆动
+                    const leftD = `M ${-b.size*0.2} 0 Q ${-b.size*1.2 - flap} ${-b.size*0.9 - flap} ${-b.size*0.2} ${-b.size*0.2}`;
+                    const rightD = `M ${b.size*0.2} 0 Q ${b.size*1.2 + flap} ${-b.size*0.9 - flap} ${b.size*0.2} ${-b.size*0.2}`;
+                    b.parts.left.setAttribute('d', leftD);
+                    b.parts.right.setAttribute('d', rightD);
+                    b.el.setAttribute('transform', `translate(${b.x},${b.y}) rotate(${angle})`);
+                }
+
+            requestAnimationFrame(drawBg);
+        }
+        requestAnimationFrame(drawBg);
+
+        /* ----------------- 瓦片（目录）随机排布与动画 ----------------- */
+        // 只保留4个板块，并指定链接
+        const items = [
+            {text:'自我介绍',href:'introduction.html'},
+            {text:'兴趣爱好',href:'hobby.html'},
+            {text:'校园相册',href:'picture.html'},
+            {text:'联系方式',href:'contact.html'},
+        ];
+        // 更贴合天蓝/浅蓝/青蓝的浅色调
+        const colors = ['#cfeffb','#bfe8ff','#b7f0ee','#d7f3ff','#aee7ff','#c7f0ff'];
+        const stage = document.getElementById('stage');
+
+        function rand(min,max){return min + Math.random()*(max-min)}
+
+        // 创建瓦片
+        const tiles = [];
+        items.forEach((it,i)=>{
+            const el = document.createElement('a');
+            el.className = 'tile';
+            el.href = it.href;
+            el.setAttribute('role','link');
+            // 在新标签页打开
+            el.target = '_blank';
+            el.rel = 'noopener noreferrer';
+            const sizeRoll = Math.random();
+            const size = sizeRoll < 0.25 ? 's' : sizeRoll < 0.75 ? 'm' : 'l';
+            el.dataset.size = size;
+            el.innerHTML = `<span class="label">${it.text}</span>`;
+            // 浅色，带一点透明度以和背景贴合
+            const c = colors[Math.floor(Math.random()*colors.length)];
+            el.style.background = `linear-gradient(135deg, ${c}, rgba(255,255,255,0.6))`;
+            el.style.color = '#013a63';
+            el.style.boxShadow = `0 10px 30px rgba(2,12,27,0.18), 0 2px 10px ${c}33`;
+            // 每个卡片加一点悬浮动画，周期不同
+            el.style.animation = `floatY ${8 + Math.random()*6}s ease-in-out ${Math.random()*2}s infinite`;
+            el.style.textDecoration = 'none';
+            stage.appendChild(el);
+            tiles.push(el);
+        });
+
+        // 布局和周期性移动
+        // 布局：将4个卡片分散到页面四个区域，方便浏览并避免重叠
+        function layoutAll(){
+            const W = window.innerWidth;
+            const H = window.innerHeight;
+            const pads = [
+                {xMin:40, xMax:W/2 - 60, yMin:120, yMax:H/2 - 40},
+                {xMin:W/2 + 20, xMax:W - 240, yMin:120, yMax:H/2 - 40},
+                {xMin:40, xMax:W/2 - 60, yMin:H/2 + 10, yMax:H - 160},
+                {xMin:W/2 + 20, xMax:W - 240, yMin:H/2 + 10, yMax:H - 160}
+            ];
+            tiles.forEach((el,i)=>{
+                const rectW = el.offsetWidth || (el.dataset.size==='l'?200: el.dataset.size==='m'?160:120);
+                const rectH = el.offsetHeight || (el.dataset.size==='l'?160: el.dataset.size==='m'?140:120);
+                const zone = pads[i % pads.length];
+                const x = Math.floor(rand(zone.xMin, Math.max(zone.xMin+20, zone.xMax - rectW)));
+                const y = Math.floor(rand(zone.yMin, Math.max(zone.yMin+20, zone.yMax - rectH)));
+                // 通过 left/top 改变位置（transition 已设置）
+                el.style.left = x + 'px';
+                el.style.top = y + 'px';
+            });
+        }
+
+        // 初始布局
+        // 等待几帧以获取元素尺寸
+        requestAnimationFrame(()=>{ requestAnimationFrame(layoutAll); });
+
+        // 每隔一段时间重新排列并使卡片颜色平滑改变
+        setInterval(()=>{
+            tiles.forEach((el,i)=>{
+                const c = colors[Math.floor(Math.random()*colors.length)];
+                el.style.background = `linear-gradient(135deg, ${c}, rgba(255,255,255,0.7))`;
+                el.style.boxShadow = `0 10px 30px rgba(2,12,27,0.12), 0 2px 10px ${c}33`;
+                // 文字渐变每次也轻微变化（通过类或直接样式）
+                const accent = ['#04507a','#0077b6','#2ec4b6','#006494'];
+                el.querySelector('.label').style.background = `linear-gradient(90deg, ${accent[i%accent.length]}, ${accent[(i+1)%accent.length]})`;
+                el.querySelector('.label').style.webkitBackgroundClip = 'text';
+                el.querySelector('.label').style.color = 'transparent';
+            });
+            layoutAll();
+        }, 4200 + Math.random()*2000);
+
+        // 当窗口尺寸变化时重新布局
+        let resizeTimer;
+        window.addEventListener('resize', ()=>{
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(layoutAll, 200);
+        });
+        // 导航点击展开（触屏友好） & 点击空白处关闭（统一行为）
+        (function(){
+            const wrap = document.querySelector('.nav-circle-wrap');
+            const btn = wrap ? wrap.querySelector('.nav-circle') : null;
+            if(!wrap || !btn) return;
+            btn.addEventListener('click', (e)=>{ e.stopPropagation(); wrap.classList.toggle('open'); btn.setAttribute('aria-expanded', wrap.classList.contains('open')); });
+            document.addEventListener('click', (ev)=>{ if(!wrap.contains(ev.target)){ wrap.classList.remove('open'); btn.setAttribute('aria-expanded','false'); } });
+            btn.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); wrap.classList.toggle('open'); } });
+        })();
+    </script>
+</body>
+</html>
